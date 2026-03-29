@@ -1,0 +1,3 @@
+[console_scripts]
+doclayout_yolo = doclayout_yolo.cfg:entrypoint
+yolo = doclayout_yolo.cfg:entrypoint

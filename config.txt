@@ -1,0 +1,15 @@
+[AI]
+model = qwen2.5:7b
+temperature = 0.3
+
+[GRAPH]
+x_min = -50
+x_max = 50
+y_min = -50
+y_max = 50
+points = 1500
+
+[PATHS]
+ollama_models = C:\Users\miha\.ollama\models
+matplotlib_config = C:\Users\miha\.matplotlib
+

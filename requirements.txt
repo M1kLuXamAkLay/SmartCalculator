@@ -1,0 +1,8 @@
+sympy>=1.13
+numpy
+matplotlib
+pix2text
+ollama
+Pillow
+torch 
+torchvision torchaudio --index-url https://download.pytorch.org/whl/cpu

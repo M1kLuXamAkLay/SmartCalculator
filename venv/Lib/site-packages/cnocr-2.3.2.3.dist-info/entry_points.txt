@@ -1,0 +1,4 @@
+
+[console_scripts]
+cnocr = cnocr.cli:cli
+cnocr-clf = cnocr.clf_cli:cli
