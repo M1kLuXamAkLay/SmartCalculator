@@ -1,12 +1,12 @@
 import tkinter as tk
-from tkinter import messagebox, Toplevel, ttk, filedialog
-import re
-import traceback
+from tkinter import Toplevel, ttk, filedialog
 import os
 import configparser
 import queue
 import threading
 import time
+import sys
+import ctypes
 
 from utils import nice_float, get_sympy_locals, format_solution, detect_variable, preprocess_expr
 from ai_methods import recognize_from_photo, solve_with_ai
@@ -15,6 +15,14 @@ from ai_methods import recognize_from_photo, solve_with_ai
 class SmartCalculator(tk.Tk):
     def __init__(self):
         super().__init__()
+
+        # ===================== TASKBAR ICON FIX =====================
+        try:
+            myappid = 'SmartCalculator.1.2.1'
+            ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(myappid)
+        except:
+            pass
+
         self.title("Умный калькулятор | ЕГЭ профильная математика")
         self.geometry("1280x520")
         self.configure(bg="#1e293b")
@@ -35,9 +43,30 @@ class SmartCalculator(tk.Tk):
         self._create_left_panel()
         self._create_right_panel()
 
+        # ===================== ИКОНКА ОКНА =====================
+        try:
+            if getattr(sys, 'frozen', False):
+                icon_path = os.path.join(sys._MEIPASS, "icon.ico")
+            else:
+                icon_path = "icon.ico"
+            self.iconbitmap(icon_path)
+            self.wm_iconbitmap(icon_path)
+        except Exception as e:
+            print(f"[WARNING] Не удалось установить иконку: {e}")
+
     def _load_config(self):
         config = configparser.ConfigParser()
-        config_path = "config.txt"
+        
+        # ← НОВЫЙ КОД: config теперь всегда в пользовательской папке (решает Permission denied)
+        if getattr(sys, 'frozen', False):
+            # Для установленной программы (exe)
+            config_dir = os.path.join(os.path.expanduser("~"), "AppData", "Roaming", "SmartCalculator")
+            os.makedirs(config_dir, exist_ok=True)
+            config_path = os.path.join(config_dir, "config.txt")
+        else:
+            # Для разработки
+            config_path = "config.txt"
+
         if os.path.exists(config_path):
             config.read(config_path)
 
@@ -51,7 +80,6 @@ class SmartCalculator(tk.Tk):
             config['GRAPH'] = {'x_min': '-50', 'x_max': '50', 'y_min': '-50', 'y_max': '50', 'points': '1500'}
             updated = True
 
-        # ===================== ИСПРАВЛЕННАЯ ЛОГИКА ПУТЕЙ =====================
         user_home = os.path.expanduser("~")
         default_ollama_models = os.path.join(user_home, ".ollama", "models")
         default_matplotlib = os.path.join(user_home, ".matplotlib")
@@ -63,7 +91,6 @@ class SmartCalculator(tk.Tk):
             }
             updated = True
         else:
-            # Если в config.txt старый/неправильный путь — принудительно исправляем
             current_ollama = config.get('PATHS', 'ollama_models', fallback='')
             current_mpl = config.get('PATHS', 'matplotlib_config', fallback='')
             if current_ollama != default_ollama_models or current_mpl != default_matplotlib:
@@ -71,6 +98,7 @@ class SmartCalculator(tk.Tk):
                 config['PATHS']['matplotlib_config'] = default_matplotlib
                 updated = True
 
+        # Записываем config в разрешённое место
         if updated or not os.path.exists(config_path):
             with open(config_path, 'w', encoding='utf-8') as f:
                 config.write(f)

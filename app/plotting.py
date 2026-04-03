@@ -1,3 +1,6 @@
+import matplotlib
+matplotlib.use('TkAgg')   # ← ДОЛЖЕН БЫТЬ САМЫМ ПЕРВЫМ ИМПОРТОМ
+
 import numpy as np
 import sympy as sp
 import matplotlib.pyplot as plt
@@ -32,7 +35,6 @@ def plot_graph(eqs: list[str], x_min, x_max, y_min, y_max, num_points=1000):
     y_sym = sp.symbols('y')
 
     for i, eq_str_raw in enumerate(eqs):
-        # Определяем левую/правую часть (исправлено: поддержка неявных уравнений без оператора)
         ops = ['<=', '>=', '<', '>', '=']
         left_str = eq_str_raw
         right_str = "0"
@@ -50,7 +52,7 @@ def plot_graph(eqs: list[str], x_min, x_max, y_min, y_max, num_points=1000):
             f = sp.lambdify((x_sym, y_sym), expr, "numpy")
             Z = f(X, Y)
         except Exception as e:
-            print(f"[WARNING] Plot parse error for '{eq_str_raw}': {e}")
+            print(f"[PLOT ERROR] {eq_str_raw}: {e}")
             continue
 
         if op_type == '=':
