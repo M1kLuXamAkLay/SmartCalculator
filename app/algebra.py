@@ -2,7 +2,6 @@ from utils import nice_float, get_sympy_locals, format_solution, detect_variable
 
 
 def parse_relation(eq_str: str, var_symbol, y=None):
-    """Ленивый импорт sympy"""
     import sympy as sp
     ops = ['<=', '>=', '<', '>', '=']
     for op in sorted(ops, key=len, reverse=True):
@@ -19,29 +18,37 @@ def parse_relation(eq_str: str, var_symbol, y=None):
 
 
 def solve_single(eq_str: str) -> str:
-    """Ленивый импорт sympy"""
     try:
         import sympy as sp
         var_name = detect_variable(eq_str)
         var_symbol = sp.symbols(var_name)
         rel = parse_relation(eq_str, var_symbol, None)
-        
+
         if isinstance(rel, (sp.Lt, sp.Gt, sp.Le, sp.Ge)):
             sols = sp.solve_univariate_inequality(rel, var_symbol, relational=False)
         else:
-            sols = sp.solve(rel, var_symbol)
-            
+            sols = sp.solveset(rel, var_symbol, domain=sp.S.Complexes)  # комплексные + триг
+
         return format_solution(sols, var_name)
-        
+
+    except ZeroDivisionError:
+        return "Ошибка: деление на ноль"
+    except ValueError as e:
+        err = str(e).lower()
+        if "logarithm" in err or "log" in err:
+            return "Ошибка: аргумент логарифма ≤ 0"
+        if "sqrt" in err and "negative" in err:
+            return "Ошибка: квадратный корень из отрицательного числа (в комплексных числах используйте уравнение)"
+        return f"Ошибка: {e}"
     except Exception as e:
-        print(f"[DEBUG] solve_single: {e}")
         return f"Ошибка: {e}"
 
 
 def solve_system(eqs: list[str], x, y) -> str:
-    """Ленивый импорт sympy"""
     try:
         import sympy as sp
+        x = sp.symbols('x', real=True)
+        y = sp.symbols('y', real=True)
         relations = [parse_relation(eq, x, y) for eq in eqs]
         sols = sp.solve(relations, (x, y), dict=True)
         if not sols:
@@ -52,7 +59,6 @@ def solve_system(eqs: list[str], x, y) -> str:
 
 
 def analyze_function(eq_str: str, x) -> str:
-    """Ленивый импорт sympy"""
     try:
         import sympy as sp
         if '=' in eq_str:

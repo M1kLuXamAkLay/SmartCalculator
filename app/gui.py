@@ -7,6 +7,8 @@ import threading
 import time
 import sys
 import ctypes
+import winreg
+import traceback
 
 from utils import nice_float, get_sympy_locals, format_solution, detect_variable, preprocess_expr
 from ai_methods import recognize_from_photo, solve_with_ai
@@ -14,16 +16,24 @@ from ai_methods import recognize_from_photo, solve_with_ai
 
 class SmartCalculator(tk.Tk):
     def __init__(self):
+        # ===================== SINGLE INSTANCE (чтобы нельзя было открыть несколько окон) =====================
+        try:
+            self.mutex = ctypes.windll.kernel32.CreateMutexA(None, 1, b"Global\\SmartCalculatorMutex123")
+            if ctypes.windll.kernel32.GetLastError() == 0xb7:  # ERROR_ALREADY_EXISTS
+                sys.exit(0)
+        except:
+            pass
+
         super().__init__()
 
         # ===================== TASKBAR ICON FIX =====================
         try:
-            myappid = 'SmartCalculator.1.2.1'
+            myappid = 'SmartCalculator.1.3.0'
             ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(myappid)
         except:
             pass
 
-        self.title("Умный калькулятор | ЕГЭ профильная математика")
+        self.title("Σuler.SC v1.3.0")
         self.geometry("1280x520")
         self.configure(bg="#1e293b")
         self.resizable(True, True)
@@ -54,18 +64,20 @@ class SmartCalculator(tk.Tk):
         except Exception as e:
             print(f"[WARNING] Не удалось установить иконку: {e}")
 
+    def _get_data_dir(self):
+        """Читаем выбранную пользователем папку данных из реестра (установщик NSIS пишет туда путь)"""
+        try:
+            with winreg.OpenKey(winreg.HKEY_CURRENT_USER, r"Software\SmartCalculator", 0, winreg.KEY_READ) as key:
+                data_dir, _ = winreg.QueryValueEx(key, "DataDir")
+                return data_dir
+        except:
+            return os.path.join(os.path.expanduser("~"), "AppData", "Roaming", "SmartCalculator")
+
     def _load_config(self):
         config = configparser.ConfigParser()
-        
-        # ← НОВЫЙ КОД: config теперь всегда в пользовательской папке (решает Permission denied)
-        if getattr(sys, 'frozen', False):
-            # Для установленной программы (exe)
-            config_dir = os.path.join(os.path.expanduser("~"), "AppData", "Roaming", "SmartCalculator")
-            os.makedirs(config_dir, exist_ok=True)
-            config_path = os.path.join(config_dir, "config.txt")
-        else:
-            # Для разработки
-            config_path = "config.txt"
+        data_dir = self._get_data_dir()
+        os.makedirs(data_dir, exist_ok=True)
+        config_path = os.path.join(data_dir, "config.txt")
 
         if os.path.exists(config_path):
             config.read(config_path)
@@ -80,9 +92,8 @@ class SmartCalculator(tk.Tk):
             config['GRAPH'] = {'x_min': '-50', 'x_max': '50', 'y_min': '-50', 'y_max': '50', 'points': '1500'}
             updated = True
 
-        user_home = os.path.expanduser("~")
-        default_ollama_models = os.path.join(user_home, ".ollama", "models")
-        default_matplotlib = os.path.join(user_home, ".matplotlib")
+        default_ollama_models = os.path.join(data_dir, ".ollama")
+        default_matplotlib = os.path.join(data_dir, ".matplotlib")
 
         if not config.has_section('PATHS'):
             config['PATHS'] = {
@@ -98,7 +109,6 @@ class SmartCalculator(tk.Tk):
                 config['PATHS']['matplotlib_config'] = default_matplotlib
                 updated = True
 
-        # Записываем config в разрешённое место
         if updated or not os.path.exists(config_path):
             with open(config_path, 'w', encoding='utf-8') as f:
                 config.write(f)
@@ -110,7 +120,7 @@ class SmartCalculator(tk.Tk):
             ollama_models = self.config.get('PATHS', 'ollama_models')
             if ollama_models:
                 os.makedirs(ollama_models, exist_ok=True)
-                os.environ['OLLAMA_MODELS'] = ollama_models   # <-- теперь всегда правильный путь
+                os.environ['OLLAMA_MODELS'] = ollama_models
 
             mpl_config = self.config.get('PATHS', 'matplotlib_config')
             if mpl_config:
@@ -215,13 +225,27 @@ class SmartCalculator(tk.Tk):
                 self.display.insert(0, result_str)
                 return
 
+            # === Основной числовой путь ===
             result = parse_expr(expr, local_dict=get_sympy_locals(var_symbol), transformations=standard_transformations + (implicit_multiplication_application,))
             result_str = nice_float(result) if hasattr(result, 'is_number') and result.is_number else str(result)
+
+            # === ИСПРАВЛЕНИЕ: защита от 0/0, 1/0 и т.п. ===
+            if result_str in ("nan", "∞", "-∞"):
+                self.display.delete(0, tk.END)
+                self._finish_action(
+                    "⚠️ Математическая ошибка: деление на ноль или неопределённая операция\n"
+                    "(например, 0/0 или 1/0). Проверьте выражение!",
+                    "#ff6b6b"
+                )
+                return
+
             self.display.delete(0, tk.END)
             self.display.insert(0, result_str)
-        except Exception as e:
+        except Exception as exc:
+            # Для математических ошибок (NaN-сравнения и т.д.) тоже показываем в правом поле
             self.display.delete(0, tk.END)
-            self.display.insert(0, "Некорректный ввод. Проверьте выражение")
+            error_msg = str(exc) if isinstance(exc, ValueError) and "Математическая ошибка" in str(exc) else "Некорректный ввод. Проверьте выражение"
+            self._finish_action(error_msg, "#ff6b6b")
 
     # ===================== ПРАВАЯ ЧАСТЬ =====================
     def _create_right_panel(self):
@@ -339,7 +363,8 @@ class SmartCalculator(tk.Tk):
             result = compute_func()
             self.after(0, lambda: self._finish_action(result))
         except Exception as e:
-            self.after(0, lambda: self._finish_action(f"Ошибка вычисления: {str(e)}", "#ff6b6b"))
+            tb = traceback.format_exc()
+            self.after(0, lambda: self._finish_action(f"Техническая ошибка:\n\n{tb}", "#ff6b6b"))
 
     def _update_ai_status(self):
         if not self.ai_running:
@@ -352,16 +377,13 @@ class SmartCalculator(tk.Tk):
         self.result_text.delete("1.0", tk.END)
 
         if self.ai_progress_logs and self.ai_progress_logs[-1].startswith("📥"):
-            # Режим скачивания модели — как было раньше
             warning = "⚠️ ВНИМАНИЕ: НЕ ЗАКРЫВАЙТЕ ПРОГРАММУ во время скачивания модели!"
             self.result_text.insert("1.0", warning + "\n")
             self.result_text.insert(tk.END, self.ai_progress_logs[-1] + "\n")
         else:
-            # === ОСНОВНОЙ РЕЖИМ РЕШЕНИЯ ЗАДАЧИ ===
             self.result_text.insert("1.0", "📝 Распознана задача ЕГЭ. Решаю с помощью ИИ...\n")
             if self.ai_progress_logs:
                 self.result_text.insert(tk.END, self.ai_progress_logs[-1] + "\n")
-            
             self.result_text.insert(tk.END, time_str)
 
         if self.showing_warning:
