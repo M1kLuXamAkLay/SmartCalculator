@@ -1,6 +1,6 @@
 ﻿; ========================================================
 ; Σuler.SC installer by NSIS 
-; Version 1.3.0 — onedir структура (быстрый запуск)
+; Version 1.3.0 — иконка теперь из .exe
 ; ========================================================
 
 Unicode true
@@ -42,15 +42,10 @@ Function .onInit
     StrCpy $DataDir "$APPDATA\Σuler.SC"
 FunctionEnd
 
-; ========================================================
-; Sections
-; ========================================================
-
 Section "$(SecMain)" SecMain
   SectionIn RO
   SetOutPath "$INSTDIR"
   
-  ; === КОПИРУЕМ ВСЮ ГОТОВУЮ СТРУКТУРУ ИЗ PyInstaller onedir ===
   File /r "dist\Σuler.SC\*"
 
   CreateDirectory "$DataDir"
@@ -58,12 +53,13 @@ Section "$(SecMain)" SecMain
   CreateDirectory "$DataDir\.ollama"
   CreateDirectory "$DataDir\.matplotlib"
 
-  ; Записываем путь к папке данных в реестр
   WriteRegStr HKCU "Software\Σuler.SC" "DataDir" "$DataDir"
 
   CreateDirectory "$SMPROGRAMS\Σuler.SC"
+  
+  ; === ИСПРАВЛЕНИЕ: иконка берётся из .exe (встроена PyInstaller) ===
   CreateShortcut "$SMPROGRAMS\Σuler.SC\Σuler.SC.lnk" \
-    "$INSTDIR\Σuler.SC.exe" "" "$INSTDIR\icon.ico" 0 "" "" "Умный калькулятор ЕГЭ"
+    "$INSTDIR\Σuler.SC.exe" "" "$INSTDIR\Σuler.SC.exe" 0 "" "" "Умный калькулятор ЕГЭ"
 
   WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\Σuler.SC" "DisplayName" "Σuler.SC 1.3.0"
   WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\Σuler.SC" "UninstallString" '"$INSTDIR\uninstall.exe"'
@@ -77,8 +73,9 @@ Section "$(SecMain)" SecMain
 SectionEnd
 
 Section "$(SecDesktop)" SecDesktop
+  ; === ИСПРАВЛЕНИЕ: иконка берётся из .exe ===
   CreateShortcut "$DESKTOP\Σuler.SC.lnk" \
-    "$INSTDIR\Σuler.SC.exe" "" "$INSTDIR\icon.ico" 0 "" "" "Умный калькулятор ЕГЭ"
+    "$INSTDIR\Σuler.SC.exe" "" "$INSTDIR\Σuler.SC.exe" 0 "" "" "Умный калькулятор ЕГЭ"
   StrCpy $DesktopStatus "создан"
 SectionEnd
 

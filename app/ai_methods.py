@@ -6,10 +6,21 @@ import os
 import subprocess
 import time
 import shutil
+import winreg
 
 
 # ===================== ГЛОБАЛЬНЫЙ ЭКЗЕМПЛЯР PIX2TEXT (ленивая инициализация) =====================
 _P2T = None
+
+
+def _get_data_dir():
+    """Читаем папку данных из реестра (установщик NSIS пишет Σuler.SC)"""
+    try:
+        with winreg.OpenKey(winreg.HKEY_CURRENT_USER, r"Software\Σuler.SC", 0, winreg.KEY_READ) as key:
+            data_dir, _ = winreg.QueryValueEx(key, "DataDir")
+            return data_dir
+    except:
+        return os.path.join(os.path.expanduser("~"), "AppData", "Roaming", "Σuler.SC")
 
 
 def _clean_math_text(text: str) -> str:
@@ -89,19 +100,12 @@ def _clean_ai_response(text: str) -> str:
     if not text:
         return ""
 
-    # 1. Убираем все Markdown-заголовки (##, ###, #### и т.д.)
     text = re.sub(r'^#{1,6}\s*', '', text, flags=re.MULTILINE)
-
-    # 2. Убираем жирный/курсив **текст** → текст
     text = re.sub(r'\*\*?(.*?)\*\*?', r'\1', text)
-
-    # 3. Убираем пустые строки (больше 2 подряд → 2)
     text = re.sub(r'\n{3,}', '\n\n', text)
-
-    # 4. Лёгкая чистка LaTeX (оставляем формулы, но делаем их читаемыми в .txt)
     text = text.replace('\\(', '(').replace('\\)', ')')
     text = text.replace('\\[', '').replace('\\]', '')
-    text = re.sub(r'\\quad', '    ', text)          # отступы
+    text = re.sub(r'\\quad', '    ', text)
     text = re.sub(r'\\geq', '≥', text)
     text = re.sub(r'\\leq', '≤', text)
     text = re.sub(r'\\implies', '⇒', text)
@@ -109,26 +113,29 @@ def _clean_ai_response(text: str) -> str:
     text = re.sub(r'\\inf', '∞', text)
     text = re.sub(r'\\sqrt', '√', text)
     text = re.sub(r'\\frac\{([^}]*)\}\{([^}]*)\}', r'(\1)/(\2)', text)
-
-    # 5. Финальная нормализация
     text = text.strip()
-    text = re.sub(r'[ \t]+', ' ', text)             # лишние пробелы
-    text = re.sub(r'\n\s*\n', '\n\n', text)         # чистые абзацы
-
+    text = re.sub(r'[ \t]+', ' ', text)
+    text = re.sub(r'\n\s*\n', '\n\n', text)
     return text
 
 
 def get_ai_config():
+    """Обновлённая версия: правильный путь через реестр NSIS + автосоздание config.txt + qwen2.5:7b по умолчанию"""
     config = configparser.ConfigParser()
-    config_path = "config.txt"
-    if os.path.exists(config_path):
-        config.read(config_path)
+    config_path = os.path.join(_get_data_dir(), "config.txt")
+
+    # Если файл отсутствует или пустой — создаём заново
+    if os.path.exists(config_path) and os.path.getsize(config_path) > 0:
+        config.read(config_path, encoding='utf-8')
+
     if not config.has_section('AI'):
-        config['AI'] = {'model': 'deepseek-r1:8b', 'temperature': '0.3'}
+        config['AI'] = {'model': 'qwen2.5:7b', 'temperature': '0.3'}
+        os.makedirs(os.path.dirname(config_path), exist_ok=True)
         with open(config_path, 'w', encoding='utf-8') as f:
             config.write(f)
+
     ai = config['AI']
-    model = ai.get('model', 'deepseek-r1:8b')
+    model = ai.get('model', 'qwen2.5:7b')
     try:
         temperature = float(ai.get('temperature', '0.3'))
     except:

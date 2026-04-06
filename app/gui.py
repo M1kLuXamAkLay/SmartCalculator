@@ -65,14 +65,14 @@ class SmartCalculator(tk.Tk):
             print(f"[WARNING] Не удалось установить иконку: {e}")
 
     def _get_data_dir(self):
-        """Читаем выбранную пользователем папку данных из реестра (установщик NSIS пишет туда путь)"""
+        """Читаем выбранную пользователем папку данных из реестра (установщик NSIS пишет Σuler.SC)"""
         try:
-            with winreg.OpenKey(winreg.HKEY_CURRENT_USER, r"Software\SmartCalculator", 0, winreg.KEY_READ) as key:
+            with winreg.OpenKey(winreg.HKEY_CURRENT_USER, r"Software\Σuler.SC", 0, winreg.KEY_READ) as key:
                 data_dir, _ = winreg.QueryValueEx(key, "DataDir")
                 return data_dir
         except:
-            return os.path.join(os.path.expanduser("~"), "AppData", "Roaming", "SmartCalculator")
-
+            return os.path.join(os.path.expanduser("~"), "AppData", "Roaming", "Σuler.SC")
+        
     def _load_config(self):
         config = configparser.ConfigParser()
         data_dir = self._get_data_dir()
@@ -381,7 +381,7 @@ class SmartCalculator(tk.Tk):
             self.result_text.insert("1.0", warning + "\n")
             self.result_text.insert(tk.END, self.ai_progress_logs[-1] + "\n")
         else:
-            self.result_text.insert("1.0", "📝 Распознана задача ЕГЭ. Решаю с помощью ИИ...\n")
+            self.result_text.insert("1.0", "📝 Распознана задача. Решаю с помощью ИИ...\n")
             if self.ai_progress_logs:
                 self.result_text.insert(tk.END, self.ai_progress_logs[-1] + "\n")
             self.result_text.insert(tk.END, time_str)
