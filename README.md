@@ -92,12 +92,12 @@ matplotlib_config = C:\your_path\.matplotlib
 
 ## 📡 Стек технологий
 
-GUI: Tkinter + эргономичный дизайн
+GUI: Tkinter
 Математика: SymPy 1.13
-Графика: Matplotlib + интерактивная панель
-OCR: Pix2Text (LaTeX-распознавание)
-ИИ: Ollama (любая локальная модель)
-Язык: Python 3.12
+Графика: Matplotlib
+OCR: Pix2Text
+ИИ: Ollama
+Python 3.12
 
 
 ## 📥 Источники
